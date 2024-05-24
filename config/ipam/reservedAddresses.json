@@ -1,0 +1,60 @@
+{
+  "AzureAddressPool": {
+    "CIDR": "10.96.0.0/12",
+    "Range": "10.96.0.0 - 10.111.255.255",
+    "Hosts": 1048574
+  },
+  "Pools": [
+    {
+      "Name": "WestEuropePool",
+      "CIDR": "10.96.0.0/14",
+      "Range": "10.96.0.0 - 10.99.255.255",
+      "Hosts": 262142,
+      "Reservations": [
+        {
+          "Service": "vhub-example-we",
+          "CIDR": "10.96.0.0/23",
+          "Description": "Virtual Wan West Europe"
+        },
+        {
+          "Service": "vnet-dnsresolver-we",
+          "CIDR": "10.96.2.0/24",
+          "Description": "Virtual Network DNS Resolver West Europe"
+        },
+        {
+          "Service": "group-sftp-d-we",
+          "CIDR": "10.96.5.0/26",
+          "Description": "SFTP Service"
+        },
+        {
+          "Service": "group-sftp-p-we",
+          "CIDR": "10.96.5.64/26",
+          "Description": "SFTP Service"
+        },
+        {
+          "Service": "group-sftp-t-we",
+          "CIDR": "10.96.5.128/26",
+          "Description": "SFTP Service"
+        }
+      ]
+    },
+    {
+      "Name": "AustraliaEastPool",
+      "CIDR": "10.100.0.0/14",
+      "Range": "10.100.0.0 - 10.103.255.255",
+      "Hosts": 262142
+    },
+    {
+      "Name": "EastUSAddressPool",
+      "CIDR": "10.104.0.0/14",
+      "Range": "10.104.0.0 - 10.107.255.255",
+      "Hosts": 262142
+    },
+    {
+      "Name": "ReservedPool",
+      "CIDR": "10.108.0.0/14",
+      "Range": "10.108.0.0 - 10.111.255.255",
+      "Hosts": 262142
+    }
+  ]
+}

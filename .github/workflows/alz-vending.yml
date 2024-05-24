@@ -1,0 +1,72 @@
+name: az-alz-vending
+
+on:
+  workflow_dispatch:
+    inputs:
+      landing_zone_file:
+        description: 'The full path of the landing zone file to deploy.'
+        required: true
+        type: string
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  ENV_FILE: ".env"
+
+jobs:
+  ALZ_VENDING:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: "Remove Quotation Marks from Environment File"
+        uses: azure/powershell@v1
+        with:
+          inlineScript: |
+            Write-Host $ENV_FILE
+            (Get-Content -Path $env:ENV_FILE -Encoding UTF8) | ForEach-Object {$_ -replace '"',''} | Out-File -FilePath $env:ENV_FILE -Encoding UTF8
+          azPSVersion: "latest"
+
+      - name: Import Environment Variables from File
+        run: cat ${{ env.ENV_FILE }} >> $GITHUB_ENV
+
+      - name: OIDC Login to Tenant
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+          enable-AzPSSession: true
+
+      - name: "Landing Zones Deployment"
+        uses: azure/powershell@v1
+        with:
+          inlineScript: |
+            .\pipeline-scripts\Deploy-LandingZoneAll.ps1 -Verbose -LandingZoneFile "${{ github.event.inputs.landing_zone_file }}"
+          azPSVersion: "11.0.0"
+
+      - name: "Setup PIM Role Settings"
+        uses: azure/powershell@v1
+        with:
+          inlineScript: |
+            $subscriptionIds = ((Get-Content $env:BICEP_OUTPUTS_ARTIFACT_PATH) | ConvertFrom-Json).subscription_id.Value
+
+            # Owner
+            .\pipeline-scripts\Setup-PIMRoleSettings.ps1 -SubscriptionIds $subscriptionIds -RoleId "8e3af657-a8ff-443c-a75c-2fe8c4bcb635" -RoleSettingsPath config\pim\role-settings\defaultRoleSettings.json -Verbose
+            # User Access Administrator
+            .\pipeline-scripts\Setup-PIMRoleSettings.ps1 -SubscriptionIds $subscriptionIds -RoleId "18d7d88d-d35e-4fb5-a5c3-7773c20a72d9" -RoleSettingsPath config\pim\role-settings\defaultRoleSettings.json -Verbose
+            # Contributor
+            .\pipeline-scripts\Setup-PIMRoleSettings.ps1 -SubscriptionIds $subscriptionIds -RoleId "b24988ac-6180-42a0-ab88-20f7382dd24c" -RoleSettingsPath config\pim\role-settings\defaultRoleSettings.json -Verbose
+            # Key Vault Secrets Officer
+            .\pipeline-scripts\Setup-PIMRoleSettings.ps1 -SubscriptionIds $subscriptionIds -RoleId "b86a8fe4-44ce-4948-aee5-eccb2c155cd7" -RoleSettingsPath config\pim\role-settings\defaultRoleSettings.json -Verbose
+            # Key Vault Secrets User
+            .\pipeline-scripts\Setup-PIMRoleSettings.ps1 -SubscriptionIds $subscriptionIds -RoleId "4633458b-17de-408a-b874-0445c86b69e6" -RoleSettingsPath config\pim\role-settings\defaultRoleSettings.json -Verbose
+            # [EXAMPLE] Subscription Owner
+            .\pipeline-scripts\Setup-PIMRoleSettings.ps1 -SubscriptionIds $subscriptionIds -RoleId "ede0987d-35f1-5d18-af11-e3c8e21e875f" -RoleSettingsPath config\pim\role-settings\defaultRoleSettings.json -Verbose
+            # Storage Blob Data Contributor
+            .\pipeline-scripts\Setup-PIMRoleSettings.ps1 -SubscriptionIds $subscriptionIds -RoleId "ba92f5b4-2d11-453d-a403-e96b0029c9fe" -RoleSettingsPath config\pim\role-settings\defaultRoleSettings.json -Verbose
+          azPSVersion: "latest"

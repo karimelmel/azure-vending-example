@@ -1,0 +1,7 @@
+{
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "postStartCommand": "pwsh",
+    "postAttachCommand": "git config --global --add safe.directory ${containerWorkspaceFolder}"
+}

@@ -1,0 +1,59 @@
+# Workflow purpose: Fix error <Creating the deployment would exceed the quota of X>
+name: cleanup-azure-deployments
+
+on:
+  schedule:
+    # Run workflow day at 22:00
+    - cron: '0 22 * * *'
+
+  workflow_dispatch:
+    inputs:
+      number_of_days_ago:
+        description: 'Delete deployments older than number of days.'
+        required: true
+        default: '3'
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  ENV_FILE: ".env"
+
+jobs:
+  CLEANUP_DEPLOYMENTS:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: "Remove Quotation Marks from Environment File"
+        uses: azure/powershell@v1
+        with:
+          inlineScript: |
+            Write-Host $ENV_FILE
+            (Get-Content -Path $env:ENV_FILE -Encoding UTF8) | ForEach-Object {$_ -replace '"',''} | Out-File -FilePath $env:ENV_FILE -Encoding UTF8
+          azPSVersion: "latest"
+
+      - name: Import Environment Variables from File
+        run: cat ${{ env.ENV_FILE }} >> $GITHUB_ENV
+
+      - name: OIDC Login to Tenant
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+          enable-AzPSSession: true
+
+      - name: "Cleanup Deployments"
+        uses: azure/powershell@v1
+        with:
+          inlineScript: |
+            $NumberOfDaysAgo = "${{ github.event.inputs.number_of_days_ago }}"
+
+            .\pipeline-scripts\Cleanup-ManagementGroupDeployments.ps1 -NumberOfDaysAgo $NumberOfDaysAgo -Verbose
+          azPSVersion: "latest"

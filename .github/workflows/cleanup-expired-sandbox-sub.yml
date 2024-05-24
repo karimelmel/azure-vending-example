@@ -1,0 +1,65 @@
+# Workflow purpose: Fulfill lifecycle for sandbox subscriptions
+name: cleanup-expired-sandbox-sub
+
+on:
+  schedule:
+    # Run workflow day at 22:00
+    - cron: '0 22 * * *'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  ENV_FILE: ".env"
+
+jobs:
+  CLEANUP_EXPIRED_SANDBOX_SUB:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: "Remove Quotation Marks from Environment File"
+        uses: azure/powershell@v1
+        with:
+          inlineScript: |
+            Write-Host $ENV_FILE
+            (Get-Content -Path $env:ENV_FILE -Encoding UTF8) | ForEach-Object {$_ -replace '"',''} | Out-File -FilePath $env:ENV_FILE -Encoding UTF8
+          azPSVersion: "latest"
+
+      - name: Import Environment Variables from File
+        run: cat ${{ env.ENV_FILE }} >> $GITHUB_ENV
+
+      - name: OIDC Login to Tenant
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+          enable-AzPSSession: true
+
+      - name: "Cleanup Expired Sandbox Subscriptions"
+        uses: azure/powershell@v1
+        with:
+          inlineScript: |
+            Install-Module -Name Az.Subscription -RequiredVersion 0.11.0 -AllowClobber -Scope CurrentUser -Force
+            .\pipeline-scripts\Cleanup-ExpiredSandboxSub.ps1 -Verbose
+          azPSVersion: "latest"
+
+      - name: "Teams Notification"
+        uses: azure/powershell@v1
+        with:
+          inlineScript: |
+            $expiredSandboxSubscriptions =  Get-Content ${{ env.BICEP_OUTPUTS_ARTIFACT_PATH }} | ConvertFrom-Json 
+            if($expiredSandboxSubscriptions -ne $null) {
+              .\pipeline-scripts\Teams-Notifications.ps1 `
+                -TeamsWebHookURL ${{ secrets.NOTIFICATIONS_TEAMS_WEB_HOOK_URL }} `
+                -WebhookMessageTitle "Expired Sandbox Subscriptions"`
+                -WebhookMessageText "These sandbox subscriptions are disabled as they have expired: <br /> $expiredSandboxSubscriptions <br /> The subscriptions should be moved to the decommissioned management group by configuring the landing zone parameter file."`
+                -Verbose
+            }
+          azPSVersion: "latest"
